@@ -9,7 +9,7 @@ const inter = Inter({ subsets: ['latin'] });
 // Metadados da aplicação (opcional, mas boa prática para SEO)
 export const metadata = {
   title: 'Dashboard de Indicadores Assistenciais',
-  description: 'Análise de desempenho da unidade de saúde com Next.js',
+  description: 'Análise de desempenho da unidade de saúde',
 };
 
 // Componente de layout raiz
@@ -21,7 +21,6 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <head>
-        {/* Adiciona o CDN do Chart.js aqui */}
       </head>
       {/* Fundo branco e texto base quase preto */}
       <body className={`${inter.className} bg-white text-gray-900`}>
@@ -32,4 +31,3 @@ export default function RootLayout({
     </html>
   );
 }
-
