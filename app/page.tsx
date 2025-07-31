@@ -21,15 +21,16 @@ export default function HomePage() {
     totalAtendimentos: 0,
     tempoEspera: 0,
     totalInternacoes: 0,
-    totalObitos: 0, // Voltou a ser calculado diretamente da propriedade obitos
+    totalObitos: 0,
   });
 
   // Estados para os dados e opções de cada gráfico
   const [riskChartData, setRiskChartData] = useState<ChartData<'doughnut'>>({ labels: [], datasets: [] });
   const [riskChartOptions, setRiskChartOptions] = useState<ChartOptions<'doughnut'>>({});
   
-  const [attendanceVsWaitTimeChartData, setAttendanceVsWaitTimeChartData] = useState<ChartData<'bar'>>({ labels: [], datasets: [] });
-  const [attendanceVsWaitTimeChartOptions, setAttendanceVsWaitTimeChartOptions] = useState<ChartOptions<'bar'>>({});
+  // CORREÇÃO AQUI: Permite datasets de 'bar' ou 'line'
+  const [attendanceVsWaitTimeChartData, setAttendanceVsWaitTimeChartData] = useState<ChartData<'bar' | 'line'>>({ labels: [], datasets: [] });
+  const [attendanceVsWaitTimeChartOptions, setAttendanceVsWaitTimeChartOptions] = useState<ChartOptions<'bar' | 'line'>>({});
 
   const [outcomesChartData, setOutcomesChartData] = useState<ChartData<'bar'>>({ labels: [], datasets: [] });
   const [outcomesChartOptions, setOutcomesChartOptions] = useState<ChartOptions<'bar'>>({});
@@ -44,7 +45,7 @@ export default function HomePage() {
   const [modalMessage, setModalMessage] = useState<string>(''); // Mensagem do modal de confirmação
   const [modalAction, setModalAction] = useState<(() => void) | null>(null); // Ação a ser executada pelo modal de confirmação
 
-  // Remover estados do modal de visualização de óbitos detalhados
+  // Novos estados para o modal de visualização
   const [isViewModalOpen, setIsViewModalOpen] = useState<boolean>(false); // Controla a visibilidade do modal de visualização
   const [viewingRecord, setViewingRecord] = useState<AssistencialRecord | null>(null); // Registo atualmente em visualização
 
@@ -97,24 +98,25 @@ export default function HomePage() {
   }, [fetchData]);
 
   // Função para atualizar os valores dos KPIs
-  const updateKPIs = (data: AssistencialRecord[]) => { // Tipo atualizado
+  const updateKPIs = (data: AssistencialRecord[]) => {
     const totalAtendimentos = data.reduce((sum, item) => sum + item.atendimentos, 0);
     const totalInternacoes = data.reduce((sum, item) => sum + item.internacoes, 0);
-    // Soma a quantidade de óbitos diretamente da propriedade 'obitos'
-    const totalObitos = data.reduce((sum, item) => sum + item.obitos, 0);
-    const totalEspera = data.reduce((sum, item) => sum + item.espera * item.atendimentos, 0);
-    const avgEspera = totalAtendimentos > 0 ? (totalEspera / totalAtendimentos).toFixed(0) : 0;
+    const totalObitos = data.reduce((sum, item) => sum + item.obitos, 0); // Já é number
+
+    const totalEsperaSum = data.reduce((sum, item) => sum + item.espera * item.atendimentos, 0);
+    const avgEsperaValue = totalAtendimentos > 0 ? (totalEsperaSum / totalAtendimentos) : 0;
+    const formattedAvgEspera = avgEsperaValue.toFixed(0); // Retorna string
 
     setKpiData({
       totalAtendimentos,
-      tempoEspera: parseFloat(avgEspera),
+      tempoEspera: parseFloat(formattedAvgEspera), // Converte para number
       totalInternacoes,
       totalObitos,
     });
   };
 
   // Lógica do gráfico de Classificação de Risco
-  const updateRiskChart = (data: AssistencialRecord[]) => { // Tipo atualizado
+  const updateRiskChart = (data: AssistencialRecord[]) => {
     const riskCounts = data.reduce((acc, item) => {
       acc.azul += item.azul;
       acc.verde += item.verde;
@@ -149,7 +151,7 @@ export default function HomePage() {
   };
 
   // Lógica do gráfico de Atendimentos vs. Tempo de Espera
-  const updateAttendanceVsWaitTimeChart = (data: AssistencialRecord[]) => { // Tipo atualizado
+  const updateAttendanceVsWaitTimeChart = (data: AssistencialRecord[]) => {
     const labels = data.map(item => `${item.data.slice(8,10)}/${item.data.slice(5,7)} - ${item.turno}`);
     const attendanceData = data.map(item => item.atendimentos);
     const waitTimeData = data.map(item => item.espera);
@@ -200,8 +202,7 @@ export default function HomePage() {
   };
 
   // Lógica do gráfico de Análise de Desfechos Críticos
-  const updateOutcomesChart = (data: AssistencialRecord[]) => { // Tipo atualizado
-    // A contagem de óbitos agora é feita diretamente da propriedade 'obitos'
+  const updateOutcomesChart = (data: AssistencialRecord[]) => {
     const totalObitos = data.reduce((sum, item) => sum + item.obitos, 0);
 
     const outcomesCounts = {
@@ -233,7 +234,7 @@ export default function HomePage() {
   };
 
   // Lógica do gráfico de Recursos Utilizados
-  const updateResourcesChart = (data: AssistencialRecord[]) => { // Tipo atualizado
+  const updateResourcesChart = (data: AssistencialRecord[]) => {
     const avaliacoes = data.reduce((acc, item) => {
         if (item.avaliacaoTipo && item.avaliacoes > 0) {
             acc[item.avaliacaoTipo] = (acc[item.avaliacaoTipo] || 0) + item.avaliacoes;
@@ -296,7 +297,7 @@ export default function HomePage() {
   const uniqueDates = [...new Set(dataRecords.map(item => item.data))].sort();
 
   // Lógica de gerenciamento de dados (agora interagindo com a API)
-  const handleSaveRecord = async (record: AssistencialRecord) => { // Tipo atualizado
+  const handleSaveRecord = async (record: AssistencialRecord) => {
     try {
       // Validação de duplicados
       const isDuplicate = dataRecords.some(
@@ -356,7 +357,7 @@ export default function HomePage() {
   };
 
   const handleDeleteRecord = (id: string) => {
-    setModalMessage('Tem certeza que deseja excluir este registo?'); // Mensagem simplificada
+    setModalMessage('Tem certeza que deseja excluir este registo?');
     setModalAction(() => async () => { // Ação assíncrona para o modal
       try {
         const response = await fetch(`/api/data?id=${id}`, {
@@ -381,8 +382,8 @@ export default function HomePage() {
     toast.info('Formulário limpo.');
   };
 
-  // Função para visualizar um registo no modal (tipo de record atualizado)
-  const handleViewRecord = (record: AssistencialRecord) => { // Tipo atualizado
+  // Função para visualizar um registo no modal
+  const handleViewRecord = (record: AssistencialRecord) => {
     setViewingRecord(record);
     setIsViewModalOpen(true);
   };
@@ -497,7 +498,7 @@ export default function HomePage() {
           data={dataRecords}
           onEdit={handleEditRecord}
           onDelete={handleDeleteRecord}
-          onView={handleViewRecord}
+          onView={handleViewRecord} 
         />
       </div>
 
