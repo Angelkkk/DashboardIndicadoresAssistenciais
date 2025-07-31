@@ -28,7 +28,6 @@ export default function HomePage() {
   const [riskChartData, setRiskChartData] = useState<ChartData<'doughnut'>>({ labels: [], datasets: [] });
   const [riskChartOptions, setRiskChartOptions] = useState<ChartOptions<'doughnut'>>({});
   
-  // CORREÇÃO AQUI: Permite datasets de 'bar' ou 'line'
   const [attendanceVsWaitTimeChartData, setAttendanceVsWaitTimeChartData] = useState<ChartData<'bar' | 'line'>>({ labels: [], datasets: [] });
   const [attendanceVsWaitTimeChartOptions, setAttendanceVsWaitTimeChartOptions] = useState<ChartOptions<'bar' | 'line'>>({});
 
@@ -421,27 +420,20 @@ export default function HomePage() {
             <div className="flex flex-col sm:flex-row items-center space-y-3 sm:space-y-0 sm:space-x-4">
                 <label htmlFor="date-filter" className="font-semibold text-gray-700">Filtrar por Período:</label>
                 <div id="date-filter" className="flex flex-wrap gap-2">
-                    {/* Botão "Todos os Dias" */}
-                    <button
-                        onClick={() => setCurrentFilter('all')}
-                        className={`filter-btn px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                            currentFilter === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
+                    {/* Select para o filtro de datas */}
+                    <select
+                      id="date-filter-select"
+                      value={currentFilter}
+                      onChange={(e) => setCurrentFilter(e.target.value)}
+                      className="mt-1 block w-full text-gray-500 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                     >
-                        Todos os Dias
-                    </button>
-                    {/* Botões de filtro para datas únicas */}
-                    {uniqueDates.map(date => (
-                        <button
-                            key={date}
-                            onClick={() => setCurrentFilter(date)}
-                            className={`filter-btn px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                                currentFilter === date ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
-                        >
-                            {new Date(date + 'T00:00:00').toLocaleDateString('pt-BR')}
-                        </button>
-                    ))}
+                      <option value="all">Todos os Dias</option>
+                      {uniqueDates.map(date => (
+                        <option key={date} value={date}>
+                          {new Date(date + 'T00:00:00').toLocaleDateString('pt-BR')}
+                        </option>
+                      ))}
+                    </select>
                 </div>
             </div>
         </div>
