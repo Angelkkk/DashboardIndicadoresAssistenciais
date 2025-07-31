@@ -1,10 +1,10 @@
 "use client"; // Marca este componente como um Client Component
 
 import React from 'react';
-import { AssistencialRecord } from '../lib/data'; // Importa AssistencialRecord (sem WithObitos)
+import { AssistencialRecord, QuantifiedItem } from '../lib/data';
 
 interface ViewRecordModalProps {
-  record: AssistencialRecord | null; // Tipo atualizado
+  record: AssistencialRecord | null;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -19,6 +19,15 @@ export default function ViewRecordModal({ record, isOpen, onClose }: ViewRecordM
     } catch (e) {
       return dateString; // Retorna a string original se houver erro de formatação
     }
+  };
+
+  // Função auxiliar para renderizar as tags de um array de objetos
+  const renderQuantifiedItems = (items: QuantifiedItem[]) => {
+      return items?.filter(item => item.nome)?.map((item, index) => (
+          <span key={item.id || index} className="inline-block bg-gray-200 rounded-full px-3 py-1 text-sm font-semibold text-gray-700 mr-2 mb-2">
+              {item.nome} ({item.quantidade})
+          </span>
+      )) || <p className="text-sm text-gray-500">Nenhum registo.</p>;
   };
 
   return (
@@ -43,13 +52,19 @@ export default function ViewRecordModal({ record, isOpen, onClose }: ViewRecordM
           <p><strong>Tempo Espera (min):</strong> {record.espera}</p>
           <p><strong>Internações:</strong> {record.internacoes}</p>
           <p><strong>Permanência (dias):</strong> {record.permanencia}</p>
-          <p><strong>Tipo Avaliação:</strong> {record.avaliacaoTipo || 'N/A'}</p>
-          <p><strong>Nº Avaliações:</strong> {record.avaliacoes}</p>
-          <p><strong>Tipo Exame:</strong> {record.exameTipo || 'N/A'}</p>
-          <p><strong>Nº Exames:</strong> {record.exames}</p>
+          <div className="col-span-full">
+            <p><strong>Avaliações Especializadas:</strong></p>
+            <div className="mt-1">{renderQuantifiedItems(record.avaliacaoTipo)}</div>
+          </div>
+          <div className="col-span-full">
+            <p><strong>Exames Solicitados:</strong></p>
+            <div className="mt-1">{renderQuantifiedItems(record.exameTipo)}</div>
+          </div>
           <p><strong>Eventos Adversos:</strong> {record.eventos}</p>
-          <p><strong>Óbitos:</strong> {record.obitos}</p> {/* Exibe a propriedade obitos diretamente */}
-          <p className="col-span-full"><strong>Causa Óbito:</strong> {record.causaObito || 'N/A'}</p> {/* Exibe a causaObito diretamente */}
+          <div className="col-span-full">
+            <p><strong>Óbitos:</strong></p>
+            <div className="mt-1">{renderQuantifiedItems(record.causaObito)}</div>
+          </div>
         </div>
 
         <div className="mt-6 flex justify-end">

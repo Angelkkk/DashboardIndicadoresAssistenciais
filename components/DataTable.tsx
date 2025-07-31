@@ -1,7 +1,7 @@
 "use client"; // Marca este componente como um Client Component
 
-import React, { useState, useMemo } from 'react'; // Importa useState e useMemo
-import { AssistencialRecord } from '../lib/data';
+import React, { useState, useMemo } from 'react';
+import { AssistencialRecord, QuantifiedItem } from '../lib/data';
 
 interface DataTableProps {
   data: AssistencialRecord[];
@@ -12,9 +12,8 @@ interface DataTableProps {
 
 export default function DataTable({ data, onEdit, onDelete, onView }: DataTableProps) {
   const [filterDate, setFilterDate] = useState<string>('');
-  const [filterTurno, setFilterTurno] = useState<string>('all'); // 'all' para não filtrar por turno
+  const [filterTurno, setFilterTurno] = useState<string>('all');
 
-  // Filtra os dados com base nos estados de filtro
   const filteredData = useMemo(() => {
     return data.filter(record => {
       const matchesDate = filterDate ? record.data === filterDate : true;
@@ -23,11 +22,14 @@ export default function DataTable({ data, onEdit, onDelete, onView }: DataTableP
     });
   }, [data, filterDate, filterTurno]);
 
+  const calculateTotal = (items: QuantifiedItem[] | undefined) => {
+    return items?.reduce((sum, item) => sum + item.quantidade, 0) || 0;
+  };
+
   return (
     <div className="bg-white p-4 md:p-6 rounded-xl shadow-sm">
       <h2 className="text-xl font-semibold mb-4">Registos Existentes</h2>
       
-      {/* Seção de Filtros da Tabela */}
       <div className="mb-4 flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
         <div>
           <label htmlFor="filter-date" className="block text-sm font-medium text-gray-700">Filtrar por Data:</label>
@@ -36,7 +38,7 @@ export default function DataTable({ data, onEdit, onDelete, onView }: DataTableP
             id="filter-date"
             value={filterDate}
             onChange={(e) => setFilterDate(e.target.value)}
-            className="mt-5 block w-full text-gray-500 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
           />
         </div>
         <div>
@@ -45,7 +47,7 @@ export default function DataTable({ data, onEdit, onDelete, onView }: DataTableP
             id="filter-turno"
             value={filterTurno}
             onChange={(e) => setFilterTurno(e.target.value)}
-            className="mt-5 block w-full text-gray-500 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
           >
             <option value="all">Todos os Turnos</option>
             <option value="Manhã">Manhã</option>
@@ -53,7 +55,6 @@ export default function DataTable({ data, onEdit, onDelete, onView }: DataTableP
             <option value="Noite">Noite</option>
           </select>
         </div>
-        {/* Botão para limpar filtros */}
         {(filterDate || filterTurno !== 'all') && (
           <button
             onClick={() => {
@@ -89,7 +90,7 @@ export default function DataTable({ data, onEdit, onDelete, onView }: DataTableP
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{record.espera}</td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{record.internacoes}</td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">
-                  {record.obitos}
+                  {calculateTotal(record.causaObito)}
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm font-medium">
                   <button
@@ -124,4 +125,3 @@ export default function DataTable({ data, onEdit, onDelete, onView }: DataTableP
     </div>
   );
 }
-
