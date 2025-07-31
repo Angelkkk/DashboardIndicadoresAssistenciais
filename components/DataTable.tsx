@@ -38,7 +38,7 @@ export default function DataTable({ data, onEdit, onDelete, onView }: DataTableP
             id="filter-date"
             value={filterDate}
             onChange={(e) => setFilterDate(e.target.value)}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            className="mt-1 block w-full rounded-md border-gray-300 text-gray-500 shadow-sm focus:border-blue-500 focus:ring-blue-500"
           />
         </div>
         <div>
@@ -47,7 +47,7 @@ export default function DataTable({ data, onEdit, onDelete, onView }: DataTableP
             id="filter-turno"
             value={filterTurno}
             onChange={(e) => setFilterTurno(e.target.value)}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            className="mt-1 block w-full rounded-md border-gray-300 text-gray-500 shadow-sm focus:border-blue-500 focus:ring-blue-500"
           >
             <option value="all">Todos os Turnos</option>
             <option value="Manhã">Manhã</option>
