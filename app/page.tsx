@@ -366,6 +366,15 @@ export default function HomePage() {
     setIsViewModalOpen(true);
   };
 
+  const handleShowDataManagement = () => {
+      const password = window.prompt('Digite a senha para acessar a área de gerenciamento:');
+      if (password === '12345') { // A senha '12345' é apenas um exemplo
+          setShowDashboard(false);
+      } else {
+          toast.error('Senha incorreta!');
+      }
+  };
+
   return (
     <div className="container mx-auto p-4 md:p-6 lg:p-8">
       <header className="mb-6">
@@ -383,7 +392,7 @@ export default function HomePage() {
           Ver Dashboard
         </button>
         <button
-          onClick={() => setShowDashboard(false)}
+          onClick={handleShowDataManagement} // Chama a nova função de validação
           className={`px-6 py-3 text-lg font-medium rounded-xl shadow transition-colors ${
             !showDashboard ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
           }`}
@@ -416,7 +425,7 @@ export default function HomePage() {
                   id="turno-filter-select"
                   value={filterTurno}
                   onChange={(e) => setFilterTurno(e.target.value)}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-gray-500 focus:border-blue-500 focus:ring-blue-500"
+                  className="mt-1 block w-full rounded-md border-gray-300 text-gray-500 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 >
                   <option value="all">Todos os Turnos</option>
                   <option value="Manhã">Manhã</option>
@@ -498,3 +507,4 @@ export default function HomePage() {
     </div>
   );
 }
+
