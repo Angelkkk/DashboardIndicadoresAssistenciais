@@ -1,103 +1,523 @@
-import Image from "next/image";
+"use client"; // Marca este componente como um Client Component
 
-export default function Home() {
+import { useState, useEffect, useCallback } from 'react'; // Importa os hooks useState, useEffect e useCallback
+import KPIcard from '../components/KPIcard'; // Importa o componente KPIcard
+import ChartCard from '../components/ChartCard'; // Importa o novo componente ChartCard
+import DataForm from '../components/DataForm'; // Importa o componente DataForm
+import DataTable from '../components/DataTable'; // Importa o componente DataTable
+import CustomModal from '../components/CustomModal'; // Importa o componente CustomModal
+import ViewRecordModal from '../components/ViewRecordModal'; // Importa o novo componente ViewRecordModal
+import { AssistencialRecord } from '../lib/data'; // Importa apenas AssistencialRecord
+import { ChartData, ChartOptions } from 'chart.js'; // Importa os tipos do Chart.js
+import { toast } from 'react-toastify'; // Importa a função toast
+
+export default function HomePage() {
+  // Estado para armazenar os registos de dados
+  const [dataRecords, setDataRecords] = useState<AssistencialRecord[]>([]);
+  // Estado para o filtro de data atual
+  const [currentFilter, setCurrentFilter] = useState<string>('all');
+  // Estado para os valores dos KPIs
+  const [kpiData, setKpiData] = useState({
+    totalAtendimentos: 0,
+    tempoEspera: 0,
+    totalInternacoes: 0,
+    totalObitos: 0, // Voltou a ser calculado diretamente da propriedade obitos
+  });
+
+  // Estados para os dados e opções de cada gráfico
+  const [riskChartData, setRiskChartData] = useState<ChartData<'doughnut'>>({ labels: [], datasets: [] });
+  const [riskChartOptions, setRiskChartOptions] = useState<ChartOptions<'doughnut'>>({});
+  
+  const [attendanceVsWaitTimeChartData, setAttendanceVsWaitTimeChartData] = useState<ChartData<'bar'>>({ labels: [], datasets: [] });
+  const [attendanceVsWaitTimeChartOptions, setAttendanceVsWaitTimeChartOptions] = useState<ChartOptions<'bar'>>({});
+
+  const [outcomesChartData, setOutcomesChartData] = useState<ChartData<'bar'>>({ labels: [], datasets: [] });
+  const [outcomesChartOptions, setOutcomesChartOptions] = useState<ChartOptions<'bar'>>({});
+
+  const [resourcesChartData, setResourcesChartData] = useState<ChartData<'bar'>>({ labels: [], datasets: [] });
+  const [resourcesChartOptions, setResourcesChartOptions] = useState<ChartOptions<'bar'>>({});
+
+  // Estados para o gerenciamento de dados
+  const [showDashboard, setShowDashboard] = useState<boolean>(true); // Controla qual vista está ativa
+  const [editingRecord, setEditingRecord] = useState<AssistencialRecord | null>(null); // Registo atualmente em edição
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false); // Controla a visibilidade do modal de confirmação
+  const [modalMessage, setModalMessage] = useState<string>(''); // Mensagem do modal de confirmação
+  const [modalAction, setModalAction] = useState<(() => void) | null>(null); // Ação a ser executada pelo modal de confirmação
+
+  // Remover estados do modal de visualização de óbitos detalhados
+  const [isViewModalOpen, setIsViewModalOpen] = useState<boolean>(false); // Controla a visibilidade do modal de visualização
+  const [viewingRecord, setViewingRecord] = useState<AssistencialRecord | null>(null); // Registo atualmente em visualização
+
+
+  // Função auxiliar para quebrar labels longas em múltiplas linhas para gráficos
+  const wrapLabels = (label: string | string[], maxChars: number): string | string[] => {
+    if (Array.isArray(label)) {
+        return label.map(l => wrapLabels(l, maxChars)) as string[];
+    }
+    const words = label.split(' ');
+    let line = '';
+    const lines = [];
+    for (let i = 0; i < words.length; i++) {
+        const testLine = line + words[i] + ' ';
+        if (testLine.length > maxChars && i > 0) {
+            lines.push(line.trim());
+            line = words[i] + ' ';
+        } else {
+            line = testLine;
+        }
+    }
+    lines.push(line.trim());
+    return lines;
+  };
+
+  // Função para carregar os dados da API (agora busca apenas a tabela principal)
+  const fetchData = useCallback(async () => {
+    console.log('Frontend: Tentando buscar dados da API...');
+    try {
+      const response = await fetch('/api/data'); // Busca apenas a tabela principal
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Frontend Erro: Falha HTTP ao buscar registos principais! status: ${response.status}, mensagem: ${errorText}`);
+        toast.error('Erro ao carregar dados do servidor.');
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const records: AssistencialRecord[] = await response.json();
+      console.log('Frontend: Dados buscados com sucesso:', records);
+      setDataRecords(records);
+    } catch (error) {
+      console.error("Frontend Erro: Falha ao carregar dados:", error);
+      toast.error('Erro ao carregar dados do servidor.');
+    }
+  }, []); // Vazio pois não depende de nenhum estado ou prop
+
+  // Efeito para carregar os dados na montagem do componente
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Função para atualizar os valores dos KPIs
+  const updateKPIs = (data: AssistencialRecord[]) => { // Tipo atualizado
+    const totalAtendimentos = data.reduce((sum, item) => sum + item.atendimentos, 0);
+    const totalInternacoes = data.reduce((sum, item) => sum + item.internacoes, 0);
+    // Soma a quantidade de óbitos diretamente da propriedade 'obitos'
+    const totalObitos = data.reduce((sum, item) => sum + item.obitos, 0);
+    const totalEspera = data.reduce((sum, item) => sum + item.espera * item.atendimentos, 0);
+    const avgEspera = totalAtendimentos > 0 ? (totalEspera / totalAtendimentos).toFixed(0) : 0;
+
+    setKpiData({
+      totalAtendimentos,
+      tempoEspera: parseFloat(avgEspera),
+      totalInternacoes,
+      totalObitos,
+    });
+  };
+
+  // Lógica do gráfico de Classificação de Risco
+  const updateRiskChart = (data: AssistencialRecord[]) => { // Tipo atualizado
+    const riskCounts = data.reduce((acc, item) => {
+      acc.azul += item.azul;
+      acc.verde += item.verde;
+      acc.amarelo += item.amarelo;
+      acc.vermelho += item.vermelho;
+      return acc;
+    }, { azul: 0, verde: 0, amarelo: 0, vermelho: 0 });
+
+    setRiskChartData({
+      labels: ['Azul', 'Verde', 'Amarelo', 'Vermelho'],
+      datasets: [{
+        label: 'Nº de Atendimentos',
+        data: [riskCounts.azul, riskCounts.verde, riskCounts.amarelo, riskCounts.vermelho],
+        backgroundColor: ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444'],
+        borderColor: '#fff',
+        borderWidth: 4,
+        hoverOffset: 8
+      }]
+    });
+    setRiskChartOptions({
+        plugins: {
+            legend: {
+                position: 'bottom',
+                labels: {
+                    padding: 20,
+                    font: { size: 14 }
+                }
+            }
+        },
+        cutout: '60%'
+    });
+  };
+
+  // Lógica do gráfico de Atendimentos vs. Tempo de Espera
+  const updateAttendanceVsWaitTimeChart = (data: AssistencialRecord[]) => { // Tipo atualizado
+    const labels = data.map(item => `${item.data.slice(8,10)}/${item.data.slice(5,7)} - ${item.turno}`);
+    const attendanceData = data.map(item => item.atendimentos);
+    const waitTimeData = data.map(item => item.espera);
+
+    setAttendanceVsWaitTimeChartData({
+        labels: labels,
+        datasets: [{
+            label: 'Nº de Atendimentos',
+            data: attendanceData,
+            backgroundColor: 'rgba(59, 130, 246, 0.7)',
+            borderColor: 'rgba(59, 130, 246, 1)',
+            borderWidth: 1,
+            yAxisID: 'y',
+            type: 'bar',
+            order: 2
+        }, {
+            label: 'Tempo Médio de Espera (min)',
+            data: waitTimeData,
+            backgroundColor: 'rgba(245, 158, 11, 1)',
+            borderColor: 'rgba(245, 158, 11, 1)',
+            yAxisID: 'y1',
+            type: 'line',
+            tension: 0.3,
+            order: 1
+        }]
+    });
+    setAttendanceVsWaitTimeChartOptions({
+        plugins: {
+            legend: { position: 'top' },
+        },
+        scales: {
+            x: { grid: { display: false } },
+            y: {
+                beginAtZero: true,
+                type: 'linear',
+                position: 'left',
+                title: { display: true, text: 'Nº de Atendimentos' }
+            },
+            y1: {
+                beginAtZero: true,
+                type: 'linear',
+                position: 'right',
+                title: { display: true, text: 'Tempo de Espera (min)' },
+                grid: { drawOnChartArea: false }
+            }
+        }
+    });
+  };
+
+  // Lógica do gráfico de Análise de Desfechos Críticos
+  const updateOutcomesChart = (data: AssistencialRecord[]) => { // Tipo atualizado
+    // A contagem de óbitos agora é feita diretamente da propriedade 'obitos'
+    const totalObitos = data.reduce((sum, item) => sum + item.obitos, 0);
+
+    const outcomesCounts = {
+        internacoes: data.reduce((sum, item) => sum + item.internacoes, 0),
+        eventos: data.reduce((sum, item) => sum + item.eventos, 0),
+        obitos: totalObitos
+    };
+
+    setOutcomesChartData({
+        labels: ['Internações', 'Eventos Adversos', 'Óbitos'],
+        datasets: [{
+            label: 'Contagem',
+            data: [outcomesCounts.internacoes, outcomesCounts.eventos, outcomesCounts.obitos],
+            backgroundColor: ['#14b8a6', '#f97316', '#dc2626'],
+            borderColor: ['#0f766e', '#c2410c', '#991b1b'],
+            borderWidth: 1
+        }]
+    });
+    setOutcomesChartOptions({
+        indexAxis: 'y',
+        plugins: {
+            legend: { display: false },
+        },
+        scales: {
+            x: { beginAtZero: true, grid: { display: false } },
+            y: { grid: { display: false } }
+        }
+    });
+  };
+
+  // Lógica do gráfico de Recursos Utilizados
+  const updateResourcesChart = (data: AssistencialRecord[]) => { // Tipo atualizado
+    const avaliacoes = data.reduce((acc, item) => {
+        if (item.avaliacaoTipo && item.avaliacoes > 0) {
+            acc[item.avaliacaoTipo] = (acc[item.avaliacaoTipo] || 0) + item.avaliacoes;
+        }
+        return acc;
+    }, {} as Record<string, number>);
+
+    const exames = data.reduce((acc, item) => {
+        if (item.exameTipo && item.exames > 0) {
+            acc[item.exameTipo] = (acc[item.exameTipo] || 0) + item.exames;
+        }
+        return acc;
+    }, {} as Record<string, number>);
+
+    const allResourceLabels = [...new Set([...Object.keys(avaliacoes), ...Object.keys(exames)])];
+    const avaliacoesData = allResourceLabels.map(label => avaliacoes[label] || 0);
+    const examesData = allResourceLabels.map(label => exames[label] || 0);
+
+    setResourcesChartData({
+        labels: allResourceLabels.map(l => wrapLabels(l, 16)),
+        datasets: [{
+            label: 'Avaliações Especializadas',
+            data: avaliacoesData,
+            backgroundColor: 'rgba(37, 99, 235, 0.7)',
+            stack: 'Stack 0'
+        }, {
+            label: 'Exames Solicitados',
+            data: examesData,
+            backgroundColor: 'rgba(22, 163, 74, 0.7)',
+            stack: 'Stack 0'
+        }]
+    });
+    setResourcesChartOptions({
+        plugins: {
+            legend: { position: 'top' },
+        },
+        scales: {
+            x: { stacked: true, grid: { display: false } },
+            y: { stacked: true, beginAtZero: true }
+        }
+    });
+  };
+
+  // Função principal para atualizar o dashboard com base no filtro
+  const updateDashboard = (filter: string) => {
+    const filteredData = dataRecords.filter(d => filter === 'all' || d.data === filter);
+    updateKPIs(filteredData);
+    updateRiskChart(filteredData);
+    updateAttendanceVsWaitTimeChart(filteredData);
+    updateOutcomesChart(filteredData);
+    updateResourcesChart(filteredData);
+  };
+
+  // Efeito para atualizar o dashboard sempre que os dados ou o filtro mudam
+  useEffect(() => {
+    updateDashboard(currentFilter);
+  }, [dataRecords, currentFilter]); // Dependências: dataRecords e currentFilter
+
+  // Geração dos botões de filtro de data (agora no JSX)
+  const uniqueDates = [...new Set(dataRecords.map(item => item.data))].sort();
+
+  // Lógica de gerenciamento de dados (agora interagindo com a API)
+  const handleSaveRecord = async (record: AssistencialRecord) => { // Tipo atualizado
+    try {
+      // Validação de duplicados
+      const isDuplicate = dataRecords.some(
+        (existingRecord) =>
+          existingRecord.data === record.data &&
+          existingRecord.turno === record.turno &&
+          existingRecord.id !== record.id // Ignora o próprio registro se estiver editando
+      );
+
+      if (isDuplicate) {
+        toast.error('Já existe um registo para esta data e turno. Por favor, edite o registo existente ou escolha outra data/turno.');
+        return; // Impede a operação de salvar
+      }
+
+      let response;
+      if (record.id) {
+        // Editar registo existente
+        response = await fetch('/api/data', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(record),
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        toast.success('Registo atualizado com sucesso!');
+      } else {
+        // Adicionar novo registo
+        response = await fetch('/api/data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(record),
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        toast.success('Registo adicionado com sucesso!');
+      }
+
+      await fetchData(); // Recarrega os dados após salvar/editar
+      setEditingRecord(null); // Limpa o registo em edição
+    } catch (error) {
+      console.error("Erro ao salvar/editar registo:", error);
+      toast.error('Erro ao salvar registo.');
+    }
+  };
+
+  const handleEditRecord = (id: string) => {
+    const recordToEdit = dataRecords.find(r => r.id === id);
+    if (recordToEdit) {
+      setEditingRecord(recordToEdit);
+      setShowDashboard(false); // Mudar para a vista de gerenciamento de dados
+      toast.info('A editar registo. Preencha o formulário.');
+    } else {
+      toast.error('Registo não encontrado para edição.');
+    }
+  };
+
+  const handleDeleteRecord = (id: string) => {
+    setModalMessage('Tem certeza que deseja excluir este registo?'); // Mensagem simplificada
+    setModalAction(() => async () => { // Ação assíncrona para o modal
+      try {
+        const response = await fetch(`/api/data?id=${id}`, {
+          method: 'DELETE',
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        await fetchData(); // Recarrega os dados após excluir
+        setIsModalOpen(false); // Fecha o modal após a exclusão
+        toast.success('Registo excluído com sucesso!');
+      } catch (error) {
+        console.error("Erro ao excluir registo:", error);
+        toast.error('Erro ao excluir registo.');
+      }
+    });
+    setIsModalOpen(true); // Abre o modal
+  };
+
+  const handleClearForm = () => {
+    setEditingRecord(null);
+    toast.info('Formulário limpo.');
+  };
+
+  // Função para visualizar um registo no modal (tipo de record atualizado)
+  const handleViewRecord = (record: AssistencialRecord) => { // Tipo atualizado
+    setViewingRecord(record);
+    setIsViewModalOpen(true);
+  };
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <div className="container mx-auto p-4 md:p-6 lg:p-8">
+      <header className="mb-6">
+        <h1 className="text-3xl font-bold text-gray-900">Dashboard de Indicadores Assistenciais</h1>
+        <p className="text-gray-600 mt-1">Análise de desempenho da unidade de saúde.</p>
+      </header>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+      {/* Seção de botões de navegação */}
+      <div className="flex justify-center mb-6 space-x-4">
+          <button
+            onClick={() => setShowDashboard(true)}
+            className={`px-6 py-3 text-lg font-medium rounded-xl shadow transition-colors ${
+              showDashboard ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }`}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            Ver Dashboard
+          </button>
+          <button
+            onClick={() => setShowDashboard(false)}
+            className={`px-6 py-3 text-lg font-medium rounded-xl shadow transition-colors ${
+              !showDashboard ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }`}
           >
-            Read our docs
-          </a>
+            Gerenciar Dados
+          </button>
+      </div>
+
+      {/* Conteúdo do Dashboard */}
+      <div id="dashboard-view" className={showDashboard ? '' : 'hidden'}>
+        <div className="bg-white p-4 rounded-xl shadow-sm mb-6">
+            <div className="flex flex-col sm:flex-row items-center space-y-3 sm:space-y-0 sm:space-x-4">
+                <label htmlFor="date-filter" className="font-semibold text-gray-700">Filtrar por Período:</label>
+                <div id="date-filter" className="flex flex-wrap gap-2">
+                    {/* Botão "Todos os Dias" */}
+                    <button
+                        onClick={() => setCurrentFilter('all')}
+                        className={`filter-btn px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                            currentFilter === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                    >
+                        Todos os Dias
+                    </button>
+                    {/* Botões de filtro para datas únicas */}
+                    {uniqueDates.map(date => (
+                        <button
+                            key={date}
+                            onClick={() => setCurrentFilter(date)}
+                            className={`filter-btn px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                                currentFilter === date ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                        >
+                            {new Date(date + 'T00:00:00').toLocaleDateString('pt-BR')}
+                        </button>
+                    ))}
+                </div>
+            </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+
+        {/* Seção de KPIs */}
+        <section id="kpi-section" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6 md:mb-8">
+            <KPIcard title="Total de Atendimentos" value={kpiData.totalAtendimentos} colorClass="text-blue-600" />
+            <KPIcard title="Tempo Médio de Espera" value={`${kpiData.tempoEspera} min`} colorClass="text-amber-600" />
+            <KPIcard title="Total de Internações" value={kpiData.totalInternacoes} colorClass="text-teal-600" />
+            <KPIcard title="Total de Óbitos" value={kpiData.totalObitos} colorClass="text-red-600" />
+        </section>
+
+        {/* Seção de Gráficos */}
+        <main className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
+            <ChartCard
+                title="Fluxo de Atendimento"
+                description="Distribuição dos pacientes por classificação de risco no período selecionado."
+                chartType="doughnut"
+                chartData={riskChartData}
+                chartOptions={riskChartOptions}
+            />
+            <ChartCard
+                title="Atendimentos vs. Tempo de Espera"
+                description="Volume de atendimentos e o tempo médio de espera correspondente por turno."
+                chartType="bar"
+                chartData={attendanceVsWaitTimeChartData}
+                chartOptions={attendanceVsWaitTimeChartOptions}
+            />
+            <ChartCard
+                title="Análise de Desfechos Críticos"
+                description="Comparativo dos principais desfechos clínicos registrados."
+                chartType="bar"
+                chartData={outcomesChartData}
+                chartOptions={outcomesChartOptions}
+            />
+            <ChartCard
+                title="Recursos Utilizados"
+                description="Demandas por avaliações especializadas e exames complementares."
+                chartType="bar"
+                chartData={resourcesChartData}
+                chartOptions={resourcesChartOptions}
+            />
+        </main>
+      </div>
+
+      {/* Conteúdo de Gerenciamento de Dados */}
+      <div id="data-management-view" className={showDashboard ? 'hidden' : ''}>
+        <DataForm
+          onSave={handleSaveRecord}
+          onClear={handleClearForm}
+          editingRecord={editingRecord}
+        />
+        <DataTable
+          data={dataRecords}
+          onEdit={handleEditRecord}
+          onDelete={handleDeleteRecord}
+          onView={handleViewRecord}
+        />
+      </div>
+
+      {/* Modal de Confirmação */}
+      <CustomModal
+        isOpen={isModalOpen}
+        message={modalMessage}
+        onConfirm={() => {
+          if (modalAction) modalAction();
+          setIsModalOpen(false);
+        }}
+        onCancel={() => setIsModalOpen(false)}
+      />
+
+      {/* Modal de Visualização de Registo */}
+      <ViewRecordModal
+        record={viewingRecord}
+        isOpen={isViewModalOpen}
+        onClose={() => setIsViewModalOpen(false)}
+      />
     </div>
   );
 }
