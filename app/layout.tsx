@@ -24,6 +24,26 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <head>
+        {/* Adiciona o favicon personalizado */}
+        <link rel="icon" href="/favicon.png" type="image/png" />
+        <style>
+          {`
+            .chart-container {
+              position: relative;
+              width: 100%;
+              max-width: 600px; /* Aumenta a largura máxima */
+              margin-left: auto;
+              margin-right: auto;
+              height: 300px; /* Aumenta a altura padrão */
+              max-height: 400px;
+            }
+            @media (min-width: 768px) {
+              .chart-container {
+                height: 450px; /* Aumenta a altura para telas maiores */
+              }
+            }
+          `}
+        </style>
       </head>
       {/* Fundo branco e texto base quase preto */}
       <body className={`${inter.className} bg-white text-gray-900`}>

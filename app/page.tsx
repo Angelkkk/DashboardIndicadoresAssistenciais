@@ -152,7 +152,7 @@ export default function HomePage() {
         borderWidth: 1,
         yAxisID: 'y',
         type: 'bar',
-        order: 2
+        order: 2,
       }, {
         label: 'Tempo Médio de Espera (min)',
         data: waitTimeData,
