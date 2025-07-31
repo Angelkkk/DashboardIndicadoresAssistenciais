@@ -99,7 +99,7 @@ export default function ChartCard({ title, description, chartType, chartData, ch
 
   return (
     <div className="bg-white p-4 md:p-6 rounded-xl shadow-sm">
-      <h2 className="text-xl font-semibold mb-1">{title}</h2>
+      <h2 className="text-xl text-gray-500 font-semibold mb-1">{title}</h2>
       <p className="text-sm text-gray-500 mb-4">{description}</p>
       <div className="chart-container"> {/* Container para controlar o tamanho do canvas */}
         <canvas ref={chartRef}></canvas>
