@@ -10,6 +10,9 @@ const inter = Inter({ subsets: ['latin'] });
 export const metadata = {
   title: 'Dashboard de Indicadores Assistenciais',
   description: 'Análise de desempenho da unidade de saúde',
+  icons: {
+    icon: '/favicon.png', // A forma correta de definir o ícone nos metadados
+  },
 };
 
 // Componente de layout raiz
