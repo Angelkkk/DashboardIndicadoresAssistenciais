@@ -14,6 +14,9 @@ interface ChartCardProps {
   chartOptions?: ChartOptions;
 }
 
+// Define os tipos literais para o peso da fonte que Chart.js aceita
+type FontWeight = 'normal' | 'bold' | 'lighter' | 'bolder' | number;
+
 // Configurações de tooltip padrão para os gráficos
 const chartTooltip = {
     backgroundColor: '#fff',
@@ -24,11 +27,12 @@ const chartTooltip = {
     padding: 10,
     displayColors: true,
     bodyFont: {
-        size: 13
+        size: 13,
+        weight: 'normal' as FontWeight // Usa o tipo literal
     },
     titleFont: {
         size: 14,
-        weight: 'bold'
+        weight: 'bold' as FontWeight // Usa o tipo literal
     }
 };
 
@@ -95,8 +99,8 @@ export default function ChartCard({ title, description, chartType, chartData, ch
 
   return (
     <div className="bg-white p-4 md:p-6 rounded-xl shadow-sm">
-      <h2 className="text-xl text-gray-600 font-semibold mb-1">{title}</h2>
-      <p className="text-sm text-gray-600 mb-4">{description}</p>
+      <h2 className="text-xl font-semibold mb-1">{title}</h2>
+      <p className="text-sm text-gray-500 mb-4">{description}</p>
       <div className="chart-container"> {/* Container para controlar o tamanho do canvas */}
         <canvas ref={chartRef}></canvas>
       </div>
