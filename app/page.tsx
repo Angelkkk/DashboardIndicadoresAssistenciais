@@ -368,7 +368,7 @@ export default function HomePage() {
 
   const handleShowDataManagement = () => {
       const password = window.prompt('Digite a senha para acessar a área de gerenciamento:');
-      if (password === '12345') { // A senha '12345' é apenas um exemplo
+      if (password === '182613') { // senha para acessar a área de gerenciamento
           setShowDashboard(false);
       } else {
           toast.error('Senha incorreta!');
